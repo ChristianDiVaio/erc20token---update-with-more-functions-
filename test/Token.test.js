@@ -53,7 +53,6 @@ contract('Token', ([deployer, receiver]) => {
             it('transfers token balances', async () => {
                 let balanceOf
                 
-
                 // Before transfer
                 balanceOf = await token.balanceOf(deployer)
                 console.log("deployer balance before transfer", balanceOf)
