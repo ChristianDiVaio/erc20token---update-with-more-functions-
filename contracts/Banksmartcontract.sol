@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.0;
+
+pragma solidity ^0.8.10;
 
 import "./erc20token.sol";
 
 
-    // * // NOTICE //
+    // * // NOTES //
     //  * calculate StakeReward is used to calculate how much a user should be rewarded for their stakes
     //  * and the duration the stake has been active
      
@@ -21,30 +22,45 @@ contract Banksmartcontract {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    /*--------------- STATE VARIABLES--------------- */
+    /*--------------- State Variables --------------- */
 
     IERC20 public rewardsToken;
     IERC20 public stakingToken;
+    uint256 totalSupply = 10000 * 1e18;
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
     uint256 public rewardsDuration = 7 days;
-    uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
 
-    
-    // The reward balance of users 
+    uint256 private duration = 60 seconds; // No deposit/withdraw for 60 seconds after the staking.
+    uint256 private poolOneTime = 86400 seconds; // lock period for pool one.
+    uint256 private poolTwoTime = 172800 seconds; // lock period for pool two.
+    uint256 private poolThreeTime = 259200 seconds; // lock period for pool three;
+    uint256 private totalStakedTime;
+
+
+    /* ========== Events ========== */
+
+    event RewardAdded(uint256 reward);
+    event Staked(address indexed user, uint256 amount);
+    event Withdrawn(address indexed user, uint256 amount);
+    event RewardPaid(address indexed user, uint256 reward);
+    event RewardsDurationUpdated(uint256 newDuration);
+    event Recovered(address token, uint256 amount);
+
+    /* ========== Mapping ========== */
+
     mapping(address => uint256) public rewardsBalance ;
-    // The staking balance of users 
-    mapping(address => uint256) public stakingBalance;
-    // The total supply 
+    mapping(address => uint256) public stakingBalance;    
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
 
 }
 
-    /* CONSTRUCTOR */
 
-    constructor(
+    /*--------------- Constructor--------------- */
+
+    constructor (
         address _owner,
         address _rewardsToken
         address _stakingToken,
@@ -56,7 +72,8 @@ contract Banksmartcontract {
         rewardsDistribution = _rewardsDistribution;
     }
 
-    /* VIEWS */
+   
+    /*--------------- Function --------------- */
 
     function totalSupply() external view returns (uint256) {
         return _totalSupply;
@@ -75,36 +92,106 @@ contract Banksmartcontract {
             return rewardPerTokenStored;
         }
         return
-            rewardPerTokenStored.add(
-                lastTimeRewardApplicable().sub(lastUpdateTime).mul(rewardRate).mul(1e18).div(_totalSupply)
+            rewardPerTokenStored.+(
+                lastTimeRewardApplicable().-(lastUpdateTime).*(rewardRate).*(1e18)./(_totalSupply)
             );
     }
 
     function earned(address account) public view returns (uint256) {
-        return _balances[account].mul(rewardPerToken().sub(userRewardPerTokenPaid[account])).div(1e18).add(rewards[account]);
+        return _balances[account].*(rewardPerToken().-(userRewardPerTokenPaid[account]))./(1e18).+(rewards[account]);
     }
 
     function getRewardForDuration() external view returns (uint256) {
-        return rewardRate.mul(rewardsDuration);
+        return rewardRate.*(rewardsDuration);
     }
 
     /* Functions for staking, withdraw, getReward */
+    // -------- Pool 1 staking --------- 
 
     function stake(uint _amount) external updateReward(msg.sender) {
-        require(amount > 0, "Cannot stake 0");
-        _totalSupply = _totalSupply.add(amount);
-        _balances[msg.sender] = _balances[msg.sender].add(amount);
+        require(amount > 0); // "Cannot stake 0"
+        _totalSupply = _totalSupply.+(amount);
+        _balances[msg.sender] = _balances[msg.sender].+(amount);
         stakingToken.safeTransferFrom(msg.sender, address(this), amount);
         emit Staked(msg.sender, amount);
     }
 
+     // -------- Pool 2 staking --------- 
+
+      function stake(uint _amount) external updateReward(msg.sender) {
+        require(amount > 0); // "Cannot stake 0"
+        _totalSupply = _totalSupply.+(amount);
+        _balances[msg.sender] = _balances[msg.sender].+(amount);
+        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
+        emit Staked(msg.sender, amount);
+    }
+
+     // -------- Pool 3 staking --------- 
+
+      function stake(uint _amount) external updateReward(msg.sender) {
+        require(amount > 0); // "Cannot stake 0"
+        _totalSupply = _totalSupply.+(amount);
+        _balances[msg.sender] = _balances[msg.sender].+(amount);
+        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
+        emit Staked(msg.sender, amount);
+    }
+
+
+    // -------- Pool 1 withdraw --------- 
+
     function withdraw(uint256 amount) public updateReward(msg.sender) {
-        require(amount > 0, "Cannot withdraw 0");
-        _totalSupply = _totalSupply.sub(amount);
-        _balances[msg.sender] = _balances[msg.sender].sub(amount);
+        require(amount > 0);  // "Cannot withdraw 0"
+        _totalSupply = _totalSupply.-(amount);
+        _balances[msg.sender] = _balances[msg.sender].-(amount);
         stakingToken.safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
     }
+
+    // -------- Pool 2 withdraw --------- 
+
+
+    function withdraw(uint256 amount) public updateReward(msg.sender) {
+        require(amount > 0);  // "Cannot withdraw 0"
+        _totalSupply = _totalSupply.-(amount);
+        _balances[msg.sender] = _balances[msg.sender].-(amount);
+        stakingToken.safeTransfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, amount);
+    }
+
+    // -------- Pool 3 withdraw --------- 
+
+
+    function withdraw(uint256 amount) public updateReward(msg.sender) {
+        require(amount > 0);  // "Cannot withdraw 0"
+        _totalSupply = _totalSupply.-(amount);
+        _balances[msg.sender] = _balances[msg.sender].-(amount);
+        stakingToken.safeTransfer(msg.sender, amount);
+        emit Withdrawn(msg.sender, amount);
+    }
+
+    // -------- Pool 1 staking reward --------- 
+
+    function getReward() public updateReward(msg.sender) {
+        uint256 reward = rewards[msg.sender];
+        if (reward > 0) {
+            rewards[msg.sender] = 0;
+            rewardsToken.safeTransfer(msg.sender, reward);
+            emit RewardPaid(msg.sender, reward);
+        }
+    }
+
+    // -------- Pool 2 staking reward --------- 
+
+    function getReward() public updateReward(msg.sender) {
+        uint256 reward = rewards[msg.sender];
+        if (reward > 0) {
+            rewards[msg.sender] = 0;
+            rewardsToken.safeTransfer(msg.sender, reward);
+            emit RewardPaid(msg.sender, reward);
+        }
+    }
+
+    // -------- Pool 3 staking reward --------- 
 
     function getReward() public updateReward(msg.sender) {
         uint256 reward = rewards[msg.sender];
@@ -135,17 +222,18 @@ contract Banksmartcontract {
         // This keeps the reward rate in the right range, preventing overflows due to
         // very high values of rewardRate in the earned and rewardsPerToken functions;
         // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
+
         uint balance = rewardsToken.balanceOf(address(this));
-        require(rewardRate <= balance.div(rewardsDuration), "Provided reward too high");
+        require(rewardRate <= balance./(rewardsDuration)); //"Provided reward too high"
 
         lastUpdateTime = block.timestamp;
-        periodFinish = block.timestamp.add(rewardsDuration);
+        periodFinish = block.timestamp.+(rewardsDuration);
         emit RewardAdded(reward);
     }
 
     // Added to support recovering LP Rewards from other systems such as BAL to be distributed to holders
     function recoverERC20(address tokenAddress, uint256 tokenAmount) external onlyOwner {
-        require(tokenAddress != address(stakingToken), "Cannot withdraw the staking token");
+        require(tokenAddress != address(stakingToken)); // "Cannot withdraw the staking token"
         IERC20(tokenAddress).safeTransfer(owner, tokenAmount);
         emit Recovered(tokenAddress, tokenAmount);
     }
@@ -173,11 +261,4 @@ contract Banksmartcontract {
         _;
     }
 
-    /* ========== EVENTS ========== */
-
-    event RewardAdded(uint256 reward);
-    event Staked(address indexed user, uint256 amount);
-    event Withdrawn(address indexed user, uint256 amount);
-    event RewardPaid(address indexed user, uint256 reward);
-    event RewardsDurationUpdated(uint256 newDuration);
-    event Recovered(address token, uint256 amount);
+ 
