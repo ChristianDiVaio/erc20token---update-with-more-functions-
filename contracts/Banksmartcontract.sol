@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.0;
 
 import "./erc20token.sol";
 
 
     // * // NOTES //
     //  * calculate StakeReward is used to calculate how much a user should be rewarded for their stakes
-    //  * and the duration the stake has been active
-     
+    //  * and the duration the stake has been active  
     // First calculate how long the stake has been active
     // Use current seconds since epoch - the seconds since epoch the stake was made
     // The output will be duration in SECONDS ,
@@ -23,7 +22,7 @@ contract Banksmartcontract {
     using SafeERC20 for IERC20;
 
     /*--------------- State Variables --------------- */
-
+    
     IERC20 public rewardsToken;
     IERC20 public stakingToken;
     uint256 totalSupply = 10000 * 1e18;
@@ -33,14 +32,14 @@ contract Banksmartcontract {
     uint256 public rewardPerTokenStored;
 
     uint256 private duration = 60 seconds; // No deposit/withdraw for 60 seconds after the staking.
-    uint256 private poolOneTime = 86400 seconds; // lock period for pool one.
-    uint256 private poolTwoTime = 172800 seconds; // lock period for pool two.
-    uint256 private poolThreeTime = 259200 seconds; // lock period for pool three;
+    uint256 private poolOneTime = 86400 seconds; // lock period for pool one.(1day)
+    uint256 private poolTwoTime = 172800 seconds; // lock period for pool two.(2days)
+    uint256 private poolThreeTime = 259200 seconds; // lock period for pool three;(3days)
     uint256 private totalStakedTime;
 
 
     /* ========== Events ========== */
-
+    
     event RewardAdded(uint256 reward);
     event Staked(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
@@ -54,26 +53,34 @@ contract Banksmartcontract {
     mapping(address => uint256) public stakingBalance;    
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
-
 }
-
 
     /*--------------- Constructor--------------- */
 
-    constructor (
-        address _owner,
-        address _rewardsToken
-        address _stakingToken,
-        address _rewardsDistribution,
-        
-    ) public Owned(_owner) {
+    constructor(Banksmartcontract) public {
+        _owner = msg.sender;
+        _token = token;
+        _rewardsToken = rewardsToken;
+        _stakingToken = stakingToken;
+    }
+
+    modifier updateReward(address account) {
+        rewardPerTokenStored = rewardPerToken();
+        lastUpdateTime = lastTimeRewardApplicable();
+        if (account != address(0)) {
+            rewards[account] = earned(account);
+            userRewardPerTokenPaid[account] = rewardPerTokenStored;
+        }
+        _;
+    } 
+
+    public Owned(_owner) {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
         rewardsDistribution = _rewardsDistribution;
     }
 
-   
-    /*--------------- Function --------------- */
+    /*--------------- Functions --------------- */
 
     function totalSupply() external view returns (uint256) {
         return _totalSupply;
@@ -206,59 +213,4 @@ contract Banksmartcontract {
         withdraw(_balances[msg.sender]);
         getReward();
     }
-
-    /* RESTRICTED FUNCTIONS */
-
-    function notifyRewardAmount(uint256 reward) external onlyRewardsDistribution updateReward(address(0)) {
-        if (block.timestamp >= periodFinish) {
-            rewardRate = reward.div(rewardsDuration);
-        } else {
-            uint256 remaining = periodFinish.sub(block.timestamp);
-            uint256 leftover = remaining.mul(rewardRate);
-            rewardRate = reward.add(leftover).div(rewardsDuration);
-        }
-
-        // Ensure the provided reward amount is not more than the balance in the contract.
-        // This keeps the reward rate in the right range, preventing overflows due to
-        // very high values of rewardRate in the earned and rewardsPerToken functions;
-        // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
-
-        uint balance = rewardsToken.balanceOf(address(this));
-        require(rewardRate <= balance./(rewardsDuration)); //"Provided reward too high"
-
-        lastUpdateTime = block.timestamp;
-        periodFinish = block.timestamp.+(rewardsDuration);
-        emit RewardAdded(reward);
-    }
-
-    // Added to support recovering LP Rewards from other systems such as BAL to be distributed to holders
-    function recoverERC20(address tokenAddress, uint256 tokenAmount) external onlyOwner {
-        require(tokenAddress != address(stakingToken)); // "Cannot withdraw the staking token"
-        IERC20(tokenAddress).safeTransfer(owner, tokenAmount);
-        emit Recovered(tokenAddress, tokenAmount);
-    }
-
-    function setRewardsDuration(uint256 _rewardsDuration) external onlyOwner {
-        require(
-            block.timestamp > periodFinish,
-            "Previous rewards period must be complete before changing the duration for the new period"
-        );
-        rewardsDuration = _rewardsDuration;
-        emit RewardsDurationUpdated(rewardsDuration);
-    }
-
-    /* ========== MODIFIERS ========== 
-    when user will call stake, withdraw, getReward modifier will update the rewards
-    */
-
-    modifier updateReward(address account) {
-        rewardPerTokenStored = rewardPerToken();
-        lastUpdateTime = lastTimeRewardApplicable();
-        if (account != address(0)) {
-            rewards[account] = earned(account);
-            userRewardPerTokenPaid[account] = rewardPerTokenStored;
-        }
-        _;
-    }
-
- 
+    
